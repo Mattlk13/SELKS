@@ -4,7 +4,7 @@
 # All rights reserved
 # Debian Live/Install ISO script - oss@stamus-networks.com
 #
-# Please RUN ON Debian Jessie only !!!
+# Please RUN ON Debian Buster only !!!
 
 set -e
 
@@ -15,7 +15,7 @@ cat << EOF
 usage: $0 options
 
 ###################################
-#!!! RUN on Debian Jessie ONLY !!!#
+#!!! RUN on Debian Buster ONLY !!!#
 ###################################
 
 SELKS build your own ISO options
@@ -181,7 +181,7 @@ then
   ### END Kernel Version choice ### 
   
   lb config \
-  -a amd64 -d stretch  \
+  -a amd64 -d buster  \
   --archive-areas "main contrib" \
   --swap-file-size 2048 \
   --bootloader syslinux \
@@ -199,7 +199,7 @@ then
 else
 
   cd Stamus-Live-Build && lb config \
-  -a amd64 -d stretch \
+  -a amd64 -d buster \
   --archive-areas "main contrib" \
   --swap-file-size 2048 \
   --debian-installer live \
@@ -243,6 +243,8 @@ mkdir -p config/includes.chroot/etc/alternatives/
 mkdir -p config/includes.chroot/etc/systemd/system/
 mkdir -p config/includes.chroot/var/backups/
 mkdir -p config/includes.chroot/etc/apt/
+mkdir -p config/includes.chroot/usr/share/polkit-1/actions/
+mkdir -p config/includes.chroot/usr/share/polkit-1/rules.d/
 
 cd ../
 
@@ -267,9 +269,9 @@ cp staging/usr/share/applications/Scirius.desktop Stamus-Live-Build/config/inclu
 # Same as above but for root
 cp staging/usr/share/applications/Scirius.desktop Stamus-Live-Build/config/includes.chroot/root/Desktop/
 
-# Logstash and Elasticsearch 6 template
+# Logstash and Elasticsearch 7 template
 cp staging/etc/logstash/conf.d/logstash.conf Stamus-Live-Build/config/includes.chroot/etc/logstash/conf.d/ 
-cp staging/etc/logstash/elasticsearch6-template.json Stamus-Live-Build/config/includes.chroot/etc/logstash/ 
+cp staging/etc/logstash/elasticsearch7-template.json Stamus-Live-Build/config/includes.chroot/etc/logstash/
 
 # Moloch for SELKS set up
 #cp staging/etc/systemd/system/molochpcapread-selks.service Stamus-Live-Build/config/includes.chroot/etc/systemd/system/ 
@@ -304,22 +306,31 @@ cp staging/usr/share/applications/Evebox.desktop Stamus-Live-Build/config/includ
 
 # Copy set up IDS interface desktop shortcut.
 cp staging/usr/share/applications/Setup-IDS-Interface.desktop Stamus-Live-Build/config/includes.chroot/etc/skel/Desktop/
+chmod +x Stamus-Live-Build/config/includes.chroot/etc/skel/Desktop/Setup-IDS-Interface.desktop
 
 # Same as above but for root
-cp staging/usr/share/applications/Setup-IDS-Interface.desktop Stamus-Live-Build/config/includes.chroot/root/Desktop/
+#cp staging/usr/share/applications/Setup-IDS-Interface.desktop Stamus-Live-Build/config/includes.chroot/root/Desktop/
 
 # Copy first time set up desktop shortcut.
 cp staging/usr/share/applications/FirstTime-Setup.desktop Stamus-Live-Build/config/includes.chroot/etc/skel/Desktop/
+chmod +x Stamus-Live-Build/config/includes.chroot/etc/skel/Desktop/FirstTime-Setup.desktop
 
 # Same as above but for root
-cp staging/usr/share/applications/FirstTime-Setup.desktop Stamus-Live-Build/config/includes.chroot/root/Desktop/
+#cp staging/usr/share/applications/FirstTime-Setup.desktop Stamus-Live-Build/config/includes.chroot/root/Desktop/
 
 # Copy upgrade SELKS desktop shortcut.
 cp staging/usr/share/applications/Upgrade-SELKS.desktop Stamus-Live-Build/config/includes.chroot/etc/skel/Desktop/
+chmod +x Stamus-Live-Build/config/includes.chroot/etc/skel/Desktop/Upgrade-SELKS.desktop
 
 # Same as above but for root
-cp staging/usr/share/applications/Upgrade-SELKS.desktop Stamus-Live-Build/config/includes.chroot/root/Desktop/
+#cp staging/usr/share/applications/Upgrade-SELKS.desktop Stamus-Live-Build/config/includes.chroot/root/Desktop/
 
+# copy polkit policies for selks-user to be able to execute as root 
+# first time setup scripts
+cp staging/usr/share/polkit-1/actions/org.stamusnetworks.firsttimesetup.policy Stamus-Live-Build/config/includes.chroot/usr/share/polkit-1/actions/
+cp staging/usr/share/polkit-1/actions/org.stamusnetworks.setupidsinterface.policy Stamus-Live-Build/config/includes.chroot/usr/share/polkit-1/actions/
+cp staging/usr/share/polkit-1/actions/org.stamusnetworks.update.policy Stamus-Live-Build/config/includes.chroot/usr/share/polkit-1/actions/
+cp staging/usr/share/polkit-1/rules.d/org.stamusnetworks.rules Stamus-Live-Build/config/includes.chroot/usr/share/polkit-1/rules.d/
 
 # Add core system packages to be installed
 echo "
@@ -340,14 +351,16 @@ python-pip debian-installer-launcher live-build apt-transport-https
 # Add system tools packages to be installed
 echo "
 ethtool bwm-ng iptraf htop rsync tcpreplay sysstat hping3 screen ngrep 
-tcpflow dsniff mc python-daemon wget curl vim bootlogd lsof libpolkit-agent-1-0 libpolkit-backend-1-0 libpolkit-gobject-1-0 policykit-1" \
+tcpflow dsniff mc python-daemon wget curl vim bootlogd lsof libpolkit-agent-1-0 libpolkit-backend-1-0 libpolkit-gobject-1-0 policykit-1 policykit-1-gnome" \
 >> Stamus-Live-Build/config/package-lists/StamusNetworks-Tools.list.chroot
 
 # Unless otherwise specified the ISO will be with a Desktop Environment
 if [[ -z "$GUI" ]]; then 
-  echo "lxde fonts-lyx wireshark terminator conky" \
+  #echo "lxde fonts-lyx wireshark terminator conky" \
+  #>> Stamus-Live-Build/config/package-lists/StamusNetworks-Gui.list.chroot
+  echo "task-xfce-desktop xfce4-goodies fonts-lyx wireshark terminator" \
   >> Stamus-Live-Build/config/package-lists/StamusNetworks-Gui.list.chroot
-  echo "wireshark terminator open-vm-tools open-vm-tools lxpolkit" \
+  echo "wireshark terminator open-vm-tools open-vm-tools-desktop lxpolkit" \
   >> Stamus-Live-Build/config/package-lists/StamusNetworks-Gui.list.chroot
   
   #echo "task-xfce-desktop" >> Stamus-Live-Build/config/package-lists/desktop.list.chroot

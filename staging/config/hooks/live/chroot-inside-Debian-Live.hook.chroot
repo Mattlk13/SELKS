@@ -17,12 +17,12 @@ echo " alias ll='ls $LS_OPTIONS -l'" >> /root/.bashrc
 
 ###  Set up repos ###
 
-wget -qO - http://packages.stamus-networks.com/packages.selks5.stamus-networks.com.gpg.key | apt-key add - 
+wget -qO - http://packages.stamus-networks.com/packages.selks6.stamus-networks.com.gpg.key | apt-key add - 
 wget -qO - https://packages.elastic.co/GPG-KEY-elasticsearch | apt-key add -
 wget -qO - https://evebox.org/files/GPG-KEY-evebox | apt-key add -
 
-cat >> /etc/apt/sources.list.d/elastic-6.x.list <<EOF
-deb https://artifacts.elastic.co/packages/6.x/apt stable main
+cat >> /etc/apt/sources.list.d/elastic-7.x.list <<EOF
+deb https://artifacts.elastic.co/packages/7.x/apt stable main
 EOF
 
 cat >> /etc/apt/sources.list.d/curator5.list <<EOF
@@ -33,15 +33,15 @@ cat >> /etc/apt/sources.list.d/evebox.list <<EOF
 deb http://files.evebox.org/evebox/debian stable main
 EOF
 
-cat >> /etc/apt/sources.list.d/selks5.list <<EOF
+cat >> /etc/apt/sources.list.d/selks6.list <<EOF
 # SELKS 5 Stamus Networks repos
 #
 # Manual changes here can be overwritten during 
 # SELKS updates and upgrades !!
 
-deb http://packages.stamus-networks.com/selks5/debian/ stretch main
-deb http://packages.stamus-networks.com/selks5/debian-kernel/ stretch main
-#deb http://packages.stamus-networks.com/selks5/debian-test/ stretch main
+deb http://packages.stamus-networks.com/selks6/debian/ buster main
+deb http://packages.stamus-networks.com/selks6/debian-kernel/ buster main
+deb http://packages.stamus-networks.com/selks6/debian-test/ buster main
 EOF
 
 ###  END Set up repos ###
@@ -51,8 +51,8 @@ mkdir -p  /opt/selks/
 ### START JAVA for ELK ###
 
 apt-get update && \
-apt-get install -y ca-certificates-java openjdk-8-jre-headless \
-openjdk-8-jdk openjdk-8-jre openjdk-8-jre-headless
+apt-get install -y ca-certificates-java openjdk-11-jre-headless \
+openjdk-11-jdk openjdk-11-jre openjdk-11-jre-headless
 
 ### END JAVA for ELK ###
 
@@ -75,8 +75,9 @@ chown logstash:logstash /var/cache/logstash/sincedbs/
 ### START Suricata ###
 
 apt-get update && \
-apt-get install -y -o Dpkg::Options::="--force-confdef" suricata 
+apt-get install -y -o Dpkg::Options::="--force-confdef" suricata
 #make sure Suricata can write in /data/nsm
+mkdir -p /data/nsm/
 chown logstash -R /data/nsm/
 
 ### END Suricata ###
@@ -101,12 +102,13 @@ apt-get install -y evebox
 mkdir -p /var/lib/scirius/static/
 apt-get update && \
 apt-get install -y scirius
-sed -i 's/ELASTICSEARCH_VERSION = 5/ELASTICSEARCH_VERSION = 6/g' /etc/scirius/local_settings.py
-sed -i 's/KIBANA_VERSION=4/KIBANA_VERSION = 6/g' /etc/scirius/local_settings.py
+sed -i 's/ELASTICSEARCH_VERSION = 5/ELASTICSEARCH_VERSION = 7/g' /etc/scirius/local_settings.py
+sed -i 's/KIBANA_VERSION=4/KIBANA_VERSION = 7/g' /etc/scirius/local_settings.py
 sed -i 's/KIBANA_INDEX = "kibana-int"/KIBANA_INDEX = ".kibana"/g' /etc/scirius/local_settings.py
-sed -i 's/KIBANA_DASHBOARDS_PATH = "\/opt\/selks\/kibana5-dashboards\/"/KIBANA6_DASHBOARDS_PATH = "\/opt\/selks\/kibana6-dashboards\/"/g' /etc/scirius/local_settings.py
+sed -i 's/KIBANA_DASHBOARDS_PATH = "\/opt\/selks\/kibana5-dashboards\/"/KIBANA6_DASHBOARDS_PATH = "\/opt\/selks\/kibana7-dashboards\/"/g' /etc/scirius/local_settings.py
 echo "ELASTICSEARCH_KEYWORD = \"keyword\"" >> /etc/scirius/local_settings.py
-
+echo "USE_MOLOCH = True" >> /etc/scirius/local_settings.py
+echo "MOLOCH_URL = \"http://localhost:8005\"" >> /etc/scirius/local_settings.py
 
 # supervisor conf
 ln -s /usr/share/doc/scirius/examples/scirius-supervisor.conf /etc/supervisor/conf.d/scirius-supervisor.conf
@@ -122,7 +124,7 @@ openssl req -new -nodes -x509 -subj "/C=FR/ST=IDF/L=Paris/O=Stamus/CN=SELKS" -da
 
 rm -rf /etc/nginx/sites-enabled/default
 
-cat >> /etc/nginx/sites-available/selks5.conf <<EOF
+cat >> /etc/nginx/sites-available/selks6.conf <<EOF
 server {
     listen 127.0.0.1:80;
     listen 127.0.1.1:80;
@@ -184,6 +186,31 @@ server {
         proxy_redirect off;
     }
 
+   location /spaces/ {
+        proxy_pass http://127.0.0.1:5601/spaces/;
+        proxy_redirect off;
+    }
+
+  location /node_modules/ {
+        proxy_pass http://127.0.0.1:5601/node_modules/;
+        proxy_redirect off;
+    }
+
+  location /bootstrap.js {
+        proxy_pass http://127.0.0.1:5601/bootstrap.js;
+        proxy_redirect off;
+    }
+
+ location /internal/ {
+        proxy_pass http://127.0.0.1:5601/internal/;
+        proxy_redirect off;
+    }
+
+ location ~ "^/([\d]{5}/.*)" {
+        proxy_pass http://127.0.0.1:5601/\$1;
+        proxy_redirect off;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:8000;
         proxy_read_timeout 600;
@@ -196,13 +223,13 @@ server {
 EOF
 
 # enable sites
-ln -s /etc/nginx/sites-available/selks5.conf /etc/nginx/sites-enabled/selks5.conf
+ln -s /etc/nginx/sites-available/selks6.conf /etc/nginx/sites-enabled/selks6.conf
 
 cd /usr/share/python/scirius/ && \
 source bin/activate
 python bin/manage.py loaddata /etc/scirius/scirius.json
-python bin/manage.py addsource "ETOpen Ruleset" https://rules.emergingthreats.net/open/suricata-git/emerging.rules.tar.gz http sigs
-#python bin/manage.py addsource "SSLBL abuse.ch" https://sslbl.abuse.ch/blacklist/sslblacklist.rules http sig
+python bin/manage.py addsource "ETOpen Ruleset" https://rules.emergingthreats.net/open/suricata-5.0/emerging.rules.tar.gz http sigs
+python bin/manage.py addsource "SSLBL abuse.ch" https://sslbl.abuse.ch/blacklist/sslblacklist_tls_cert.rules http sig
 python bin/manage.py addsource "Suricata Traffic ID ruleset" https://raw.githubusercontent.com/jasonish/suricata-trafficid/master/rules/traffic-id.rules http sig
 python bin/manage.py defaultruleset "Default SELKS ruleset"
 python bin/manage.py addsuricata SELKS "Suricata on SELKS" /etc/suricata/rules "Default SELKS ruleset"
@@ -235,14 +262,15 @@ chmod g+w /var/run/suricata/ -R
 mkdir -p /opt/molochtmp
 cd /opt/molochtmp/ && \
 apt-get update && apt-get install -y libjson-perl libyaml-dev libcrypto++6 libwww-perl
-wget https://files.molo.ch/builds/ubuntu-18.04/moloch_1.7.1-1_amd64.deb
-dpkg -i moloch_1.7.1-1_amd64.deb
+wget https://s3.amazonaws.com/files.molo.ch/builds/ubuntu-18.04/moloch_2.7.1-1_amd64.deb
+dpkg -i moloch_2.7.1-1_amd64.deb
+
 
 cd /opt/
 rm /opt/molochtmp -r
 
 # make sure we hold the moloch pkg version unless explicit upgrade is wanted/needed
-apt-mark hold moloch
+#apt-mark hold moloch
 
 ### END Moloch set up
 
@@ -259,7 +287,7 @@ apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--fo
 cat >> /opt/selks/delete-old-logs.sh <<EOF
 #!/bin/bash
 
-/opt/elasticsearch-curator/curator_cli delete_indices --filter_list \
+/usr/bin/curator_cli delete-indices --filter_list \
 '
 [
   {
@@ -301,6 +329,9 @@ sed -i -e 's|Name\=Install Debian sid|Name\=Install SELKS|'  /usr/share/applicat
 # Install exception for local certificate
 certutil -A -n SELKS -t "P,p,p"  -i /etc/nginx/ssl/scirius.crt  -d /etc/iceweasel/profile/
 chmod a+r /etc/iceweasel/profile/*db
+
+#clean up root desktop
+rm -f /root/Desktop/* 
 
 apt-get update && \
 apt-get install -y linux-headers-amd64
